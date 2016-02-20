@@ -2,6 +2,10 @@ import time
 import serial
 import RPi.GPIO as GPIO
 import pygame               # External library
+import random
+
+# Initialize sound player
+pygame.mixer.init()
 
 # Setting the pin numbering style to BCM
 GPIO.setmode(GPIO.BCM)
@@ -39,7 +43,10 @@ pauseBuffer = False         # Helps identify single pause clicks
 playbackMode = False        # Plays back recorded input when enabled
 lmsArray = []               # Holds LMA data
 rmsArray = []               # Holds RMA data
-playbackCount = 0
+lvArray = []                # Holds left vertical data
+playbackCount = 0           # Index for playback iteration
+maxPlayback = 0             # Keeps track of the playback actions
+
 # Continuously runs while not exited
 while done == False:
     
@@ -76,9 +83,11 @@ while done == False:
     if Square == 1:                # Square starts record mode
         recordMode = True
         playbackMode = False
-        lmsArray[:] = []
-        rmsArray[:] = []
+        lmsArray = []
+        rmsArray = []
+        lvArray = []
         playbackCount = 0
+        maxPlayback = 0
     if Triangle == 1 and pauseBuffer == False:  # Triangle stops record mode
         pauseBuffer = True
         recordPause = not recordMode
@@ -91,11 +100,42 @@ while done == False:
         playbackMode = True
         recordMode = False
         playbackCount = 0
+    if Up == 1:                    # Plays a random sound
+        pygame.mixer.music.set_volume(0.1)
+        pygame.mixer.music.load("BB8Sounds/" + str(random.randrange(0, 19)) + "-bb8.wav")
+        pygame.mixer.music.play()
     if playbackCount >= 450:       # 15 seconds of playback at 30fps
         recordMode = False
         playbackMode = False
         recordPause = False
         pauseBuffer = False
+
+    if playbackMode == True:
+        # Iterate through playbackArrays instead of actual controller values 
+        LMS = lmsArray[playbackCount]
+        RMS = rmsArray[playbackCount]
+        LV = lvArray[playbackCount]
+        playbackCount += 1
+
+        if playbackCount >= 449 or playbackCount >= maxPlayback:
+            playbackMode = False
+    else:
+        if RH < 0:
+            # Turning left
+            LMS = 100 * (abs(LV) - abs(RH))
+            RMS = 100 * abs(LV)
+        else:
+            # Turning right
+            LMS = 100 * abs(LV)
+            RMS = 100 * (abs(LV) - abs(RH))
+
+    # Lower bounds for left motor
+    if (LMS < 0):
+        LMS = 0
+
+    # Lower bounds for left motor
+    if (RMS < 0):
+        RMS = 0
 
     if LV < 0:
         # Left stick is pushed upwards/forward
@@ -116,27 +156,20 @@ while done == False:
         GPIO.output(27, GPIO.LOW)
         GPIO.output(22,GPIO.LOW)
 
-    LMS = 100 * abs(LV)         # Set left motor speed
-    RMS = 100 * abs(RV)         # Set right motor speed
-
     if recordMode == True and recordPause == False:
         # Record values to playback arrays
-        lmsArray[playbackCount] = LMS
-        rmsArray[playbackCount] = RMS
+        lmsArray.append(LMS)
+        rmsArray.append(RMS)
+        lvArray.append(LV)
         playbackCount += 1
-    if playbackMode == True:
-        # Iterate through playbackArrays instead of actual controller values
-        motor1.ChangeDutyCycle(lmsArray[playbackCount])
-        motor2.ChangeDutyCycle(rmsArray[playbackCount])
-        playbackCount += 1
+        maxPlayback += 1
+
+    if motorOn == True:
+        motor1.ChangeDutyCycle(LMS)
+        motor2.ChangeDutyCycle(RMS)
     else:
-        # If playbackMode == False
-        if motorOn == True:
-            motor1.ChangeDutyCycle(LMS)
-            motor2.ChangeDutyCycle(RMS)
-        if motorOn == False:
-            motor1.ChangeDutyCycle(0)
-            motor2.ChangeDutyCycle(0)
+        motor1.ChangeDutyCycle(0)
+        motor2.ChangeDutyCycle(0)
 
     if L1 == 1 and R1 == 1 and R2 == 1 and L2 == 1:
         # Ends program
@@ -157,4 +190,5 @@ while done == False:
 motor1.stop()
 motor2.stop()
 GPIO.cleanup()
+pygame.mixer.quit()
 pygame.quit()
