@@ -32,6 +32,15 @@ LMS = 0                     # Left motor speed
 RMS = 0                     # Right motor speed
 motorOn = True              # Allows the motors to be used
 
+# Recording/Playback variables
+recordMode = False          # Records user input sequence when enabled
+recordPause = False         # Pauses the recording when enabled
+pauseBuffer = False         # Helps identify single pause clicks
+playbackMode = False        # Plays back recorded input when enabled
+rvArray = []                # Holds RV data
+lmsArray = []               # Holds LMA data
+rmsArray = []               # Holds RMA data
+
 # Continuously runs while not exited
 while done == False:
     
@@ -40,7 +49,9 @@ while done == False:
          if event.type == pygame.QUIT:
                  done = True
 
-    controller = pygame.joystick.Joystick(0)    # Sets controller to first joystick (can have more than one)
+    controller = pygame.joystick.Joystick(0)    # Sets controller to first
+                                                # joystick (can have more
+                                                # than one)
     controller.init()                           # Initializes controller
 
     RV = controller.get_axis(3)                 # Right stick vertical axis
@@ -56,7 +67,37 @@ while done == False:
     Start = controller.get_button(3)            # Start button
     Select = controller.get_button(0)           # Select button
     PS = controller.get_button(16)              # Playstation button
+    Triangle = controller.get_button(12)        # Triangle button
+    Circle = controller.get_button(13)          # Circle button
     X = controller.get_button(14)               # X button
+    Square = controller.get_button(15)          # Square button
+
+    ##### RECORDING / PLAYBACK BUTTON TOGGLING ####
+
+    if Square == 1:                # Square starts record mode
+        recordMode = True
+        playbackMode = False
+        rvArray[:] = []
+        lmsArray[:] = []
+        rmsArray[:] = []
+        playbackCount = 0
+    if Triangle == 1 and pauseBuffer == False:  # Triangle stops record mode
+        pauseBuffer = True
+        recordPause = not recordMode
+        pauseCount = 10
+    if Triangle == 0 and pauseBuffer == True:
+        pauseCount -= 1            # Countdown removes possibility of bouncing.
+        if pauseCount == 0:        # It takes 10 cycles before another
+            pauseBuffer = False    # pause can be initiated
+    if Circle == 1:                # Circle starts playback mode
+        playbackMode = True
+        recordMode = False
+        playbackCount = 0
+    if playbackCount >= 450:       # 15 seconds of playback at 30fps
+        recordMode = False
+        playbackMode = False
+        recordPause = False
+        pauseBuffer = False
 
     if LV < 0:
         # Left stick is pushed upwards/forward
@@ -79,9 +120,30 @@ while done == False:
 
     LMS = 100 * abs(LV)         # Set left motor speed
     RMS = 100 * abs(LV)         # Set right motor speed
+    RV = round(RV,2)
 
-    motor1.ChangeDutyCycle(LMS)
-    motor2.ChangeDutyCycle(RMS)
+    if recordMode == True && recordPause == False:
+        # Record values to playback arrays
+        rvArray[playbackCount] = RV
+        lmsArray[playbackCount] = LMS
+        rmsArray[playbackCount] = RMS
+        playbackCount += 1
+    if playbackMode == True:
+        # Iterate through playbackArrays instead of actual controller values
+        motor1.ChangeDutyCycle(lmsArray[playbackCount])
+        motor2.ChangeDutyCycle(rmsArray[playbackCount])
+        ser.write(rvArray[playbackCount])
+        playbackCount += 1
+    else:
+        # If playbackMode == False
+        if motorOn == True:
+            motor1.ChangeDutyCycle(LMS)
+            motor2.ChangeDutyCycle(RMS)
+        if motorOn == False:
+            motor1.ChangeDutyCycle(0)
+            motor2.ChangeDutyCycle(0)
+        ser.write(str(RV))
+
     # Send motor speeds to arduino for PWM
     print(LMS)
     
