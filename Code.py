@@ -3,9 +3,6 @@ import serial
 import RPi.GPIO as GPIO
 import pygame               # External library
 
-# Creating serial connection for arduino
-ser = serial.Serial('/dev/ttyACM0',9600)
-
 # Setting the pin numbering style to BCM
 GPIO.setmode(GPIO.BCM)
 
@@ -31,8 +28,8 @@ pygame.joystick.init()
 
 clock = pygame.time.Clock() # Sets the clock for later use
 done = False                # Variable for cleaning up on completion
-LMA = 0                     # Left motor speed
-RMA = 0                     # Right motor speed
+LMS = 0                     # Left motor speed
+RMS = 0                     # Right motor speed
 motorOn = True              # Allows the motors to be used
 
 # Continuously runs while not exited
@@ -46,10 +43,10 @@ while done == False:
     controller = pygame.joystick.Joystick(0)    # Sets controller to first joystick (can have more than one)
     controller.init()                           # Initializes controller
 
-    RU = controller.get_axis(3)                 # Right stick vertical axis
-    RS = controller.get_axis(2)                 # Right stick horizontal axis
-    LU = controller.get_axis(1)                 # Left stick vertical axis
-    LS = controller.get_axis(0)                 # Left stick horizontal axis
+    RV = controller.get_axis(3)                 # Right stick vertical axis
+    RH = controller.get_axis(2)                 # Right stick horizontal axis
+    LV = controller.get_axis(1)                 # Left stick vertical axis
+    LH = controller.get_axis(0)                 # Left stick horizontal axis
     L2 = controller.get_button(8)               # L2 button
     R2 = controller.get_button(9)               # R2 button
     R1 = controller.get_button(11)              # R1 button
@@ -61,64 +58,49 @@ while done == False:
     PS = controller.get_button(16)              # Playstation button
     X = controller.get_button(14)               # X button
 
-    if LU < 0:
+    if LV < 0:
         # Left stick is pushed upwards/forward
         GPIO.output(4, GPIO.HIGH)               
         GPIO.output(17,GPIO.LOW)
-
         GPIO.output(27, GPIO.HIGH)
         GPIO.output(22,GPIO.LOW)
-    else if LU > 0:
+    elif LV > 0:
         # Left stick is pushed backwards/downwards
         GPIO.output(4, GPIO.LOW)
         GPIO.output(17,GPIO.HIGH)
-        
         GPIO.output(27, GPIO.LOW)
         GPIO.output(22,GPIO.HIGH)
     else:
         # Left stick is unmoved
         GPIO.output(4, GPIO.LOW)
         GPIO.output(17,GPIO.LOW)
-        
         GPIO.output(27, GPIO.LOW)
         GPIO.output(22,GPIO.LOW)
 
-    if RMA > 100:
-        RMA = 100
-    if LMA > 100:
-        LMA = 100
-    if RMA < 40 and RMA != 0:
-        RMA = 40
-    if LMA < 40 and LMA !=0:
-        LMA = 40
-    
-    LMA = 100 * abs(LU)
-    RMA = 100 * abs(LU)
-    if L1 == 1:
-        LMA = 0
-    if R1 == 1:
-        RMA = 0
+    LMS = 100 * abs(LV)         # Set left motor speed
+    RMS = 100 * abs(LV)         # Set right motor speed
 
-    if motorOn == True:
-        motor1.ChangeDutyCycle(LMA)
-        motor2.ChangeDutyCycle(RMA)
-    if motorOn == False:
-        motor1.ChangeDutyCycle(0)
-        motor2.ChangeDutyCycle(0)
-    RU = round(RU,2)
-    ser.write(str(RU))
-    if L1 ==1 and R1 == 1 and R2 == 1 and L2 ==1:
-         done = True
-         print("Done!")
-    if X == 1:
-        print "BEE BEE DOH"
-    if Start == 1:
+    motor1.ChangeDutyCycle(LMS)
+    motor2.ChangeDutyCycle(RMS)
+    # Send motor speeds to arduino for PWM
+    print(LMS)
+    
+    if L1 == 1 and R1 == 1 and R2 == 1 and L2 == 1:
+        # Ends program
+        done = True
+        print("Done!")
+    elif Start == 1:
+        # Turning motors off
         motorOn = False
-        print "motors Off"
-    if Select == 1:
+        print "Motors turned off"
+    elif Select == 1:
+        # Turning motors on
         motorOn = True
-        print "motors On"
-    clock.tick(30)
+        print "Motors turned on"
+
+    clock.tick(30)              # Delays program
+
+# Cleanup
 motor1.stop()
 motor2.stop()
 GPIO.cleanup()
