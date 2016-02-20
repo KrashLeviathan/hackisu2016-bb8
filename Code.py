@@ -37,10 +37,9 @@ recordMode = False          # Records user input sequence when enabled
 recordPause = False         # Pauses the recording when enabled
 pauseBuffer = False         # Helps identify single pause clicks
 playbackMode = False        # Plays back recorded input when enabled
-rvArray = []                # Holds RV data
 lmsArray = []               # Holds LMA data
 rmsArray = []               # Holds RMA data
-
+playbackCount = 0
 # Continuously runs while not exited
 while done == False:
     
@@ -77,7 +76,6 @@ while done == False:
     if Square == 1:                # Square starts record mode
         recordMode = True
         playbackMode = False
-        rvArray[:] = []
         lmsArray[:] = []
         rmsArray[:] = []
         playbackCount = 0
@@ -119,12 +117,10 @@ while done == False:
         GPIO.output(22,GPIO.LOW)
 
     LMS = 100 * abs(LV)         # Set left motor speed
-    RMS = 100 * abs(LV)         # Set right motor speed
-    RV = round(RV,2)
+    RMS = 100 * abs(RV)         # Set right motor speed
 
-    if recordMode == True && recordPause == False:
+    if recordMode == True and recordPause == False:
         # Record values to playback arrays
-        rvArray[playbackCount] = RV
         lmsArray[playbackCount] = LMS
         rmsArray[playbackCount] = RMS
         playbackCount += 1
@@ -132,7 +128,6 @@ while done == False:
         # Iterate through playbackArrays instead of actual controller values
         motor1.ChangeDutyCycle(lmsArray[playbackCount])
         motor2.ChangeDutyCycle(rmsArray[playbackCount])
-        ser.write(rvArray[playbackCount])
         playbackCount += 1
     else:
         # If playbackMode == False
@@ -142,11 +137,7 @@ while done == False:
         if motorOn == False:
             motor1.ChangeDutyCycle(0)
             motor2.ChangeDutyCycle(0)
-        ser.write(str(RV))
 
-    # Send motor speeds to arduino for PWM
-    print(LMS)
-    
     if L1 == 1 and R1 == 1 and R2 == 1 and L2 == 1:
         # Ends program
         done = True
